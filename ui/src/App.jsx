@@ -12,6 +12,8 @@ function App() {
   const [sectorData, setSectorData] = useState(null)
   const [sectorLoading, setSectorLoading] = useState(true)
   const [sectorError, setSectorError] = useState(null)
+  const [maxLoss, setMaxLoss] = useState(1000)
+  const [totalCapital, setTotalCapital] = useState(100000)
 
   const fetchStocks = () => {
     fetch('http://192.168.1.12:8000/api/stocks')
@@ -51,6 +53,10 @@ function App() {
   }
 
   useEffect(() => {
+    document.body.style.backgroundColor = '#000'
+    document.body.style.color = '#fff'
+    document.body.style.margin = '0'
+
     // Initial fetch
     fetchStocks()
     fetchSectors()
@@ -67,8 +73,28 @@ function App() {
   }, [])
 
   return (
-    <div className="App" style={{ maxWidth: '1800px', margin: '0 auto', width: '100%', fontSize: '0.9rem' }}>
-      <h2>Market Overview</h2>
+    <div className="App" style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', maxWidth: '1800px', margin: '0 auto', width: '100%', fontSize: '0.9rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1rem' }}>
+        <h2 style={{ display: 'flex', color: '#fff' }}>Market Overview</h2>
+        <div style={{ display: 'flex', alignItems: 'center', color: '#fff' }}>
+          <label htmlFor="max-loss" style={{ marginRight: '10px' }}>Maximum Loss (₹):</label>
+          <input
+            id="max-loss"
+            type="number"
+            value={maxLoss}
+            onChange={(e) => setMaxLoss(Number(e.target.value))}
+            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
+          />
+          <label htmlFor="total-capital" style={{ marginLeft: '20px', marginRight: '10px' }}>Total Capital (₹):</label>
+          <input
+            id="total-capital"
+            type="number"
+            value={totalCapital}
+            onChange={(e) => setTotalCapital(Number(e.target.value))}
+            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
+          />
+        </div>
+      </div>
       
       {loading && !stocksData && <p>Loading market data...</p>}
       {error && <p style={{ color: 'red' }}>Error: {error}</p>}
@@ -98,11 +124,11 @@ function App() {
 
             {sectorData && !sectorData.error && (
               <>
-                <div className="card" style={{ flex: '1 1 300px' }}>
+              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
                   <h3 style={{ marginTop: 0 }}>Top Sector Gainers</h3>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {sectorData['top-gainer']?.map((sector) => (
-                      <li key={sector.index} style={{ padding: '0.25rem 0', borderBottom: '1px solid #444' }}>
+                    <li key={sector.index} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <strong>{sector.index}</strong>
                           <span style={{ color: 'green' }}>+{sector.percentChange}%</span>
@@ -112,11 +138,11 @@ function App() {
                   </ul>
                 </div>
 
-                <div className="card" style={{ flex: '1 1 300px' }}>
+              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
                   <h3 style={{ marginTop: 0 }}>Top Sector Losers</h3>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {sectorData['top-losers']?.map((sector) => (
-                      <li key={sector.index} style={{ padding: '0.25rem 0', borderBottom: '1px solid #444' }}>
+                    <li key={sector.index} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <strong>{sector.index}</strong>
                           <span style={{ color: 'red' }}>{sector.percentChange}%</span>
@@ -131,39 +157,39 @@ function App() {
 
           {/* Bottom Row (Stocks) */}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <div className="card" style={{ flex: 1, minWidth: '300px' }}>
+          <div className="card" style={{ flex: 1, minWidth: '300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
               <h3 style={{ marginTop: 0 }}>Top Gainers</h3>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {stocksData['top-gainer']?.map((stock) => (
                   <li 
                     key={stock.symbol}
-                    style={{ padding: '0.5rem', borderBottom: '1px solid #444', cursor: 'pointer' }}
+                  style={{ padding: '0.5rem', borderBottom: '1px solid #333', cursor: 'pointer' }}
                     onClick={() => { setSelectedSymbol(stock.symbol); setSelectedType('gainer') }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                       <strong>{stock.symbol}</strong>
                       <span style={{ color: 'green' }}>+{stock.pChange}%</span>
                     </div>
-                    <StockChart symbol={stock.symbol} lastFetchTime={lastFetchTime} type="gainer" />
+                    <StockChart symbol={stock.symbol} lastFetchTime={lastFetchTime} type="gainer" maxLoss={maxLoss} totalCapital={totalCapital} />
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="card" style={{ flex: 1, minWidth: '300px' }}>
+          <div className="card" style={{ flex: 1, minWidth: '300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
               <h3 style={{ marginTop: 0 }}>Top Losers</h3>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {stocksData['top-losers']?.map((stock) => (
                   <li 
                     key={stock.symbol}
-                    style={{ padding: '0.5rem', borderBottom: '1px solid #444', cursor: 'pointer' }}
+                  style={{ padding: '0.5rem', borderBottom: '1px solid #333', cursor: 'pointer' }}
                     onClick={() => { setSelectedSymbol(stock.symbol); setSelectedType('loser') }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                       <strong>{stock.symbol}</strong>
                       <span style={{ color: 'red' }}>{stock.pChange}%</span>
                     </div>
-                    <StockChart symbol={stock.symbol} lastFetchTime={lastFetchTime} type="loser" />
+                    <StockChart symbol={stock.symbol} lastFetchTime={lastFetchTime} type="loser" maxLoss={maxLoss} totalCapital={totalCapital} />
                   </li>
                 ))}
               </ul>
@@ -188,9 +214,10 @@ function App() {
         >
           <div 
             style={{
-              background: '#242424',
+            background: '#111',
               padding: '2rem',
               borderRadius: '8px',
+            border: '1px solid #333',
               width: '90%',
               maxWidth: '1000px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
@@ -201,7 +228,7 @@ function App() {
               <h2 style={{ margin: 0 }}>{selectedSymbol}</h2>
               <button onClick={() => setSelectedSymbol(null)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '2rem', cursor: 'pointer' }}>&times;</button>
             </div>
-            <StockChart symbol={selectedSymbol} lastFetchTime={lastFetchTime} type={selectedType} isModal={true} />
+            <StockChart symbol={selectedSymbol} lastFetchTime={lastFetchTime} type={selectedType} isModal={true} maxLoss={maxLoss} totalCapital={totalCapital} />
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Chart from 'react-apexcharts'
 
-export default function StockChart({ symbol, lastFetchTime, type, isModal = false }) {
+export default function StockChart({ symbol, lastFetchTime, type, isModal = false, maxLoss = 1000, totalCapital = 100000 }) {
   const [chartData, setChartData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -143,10 +143,15 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
         const v = volumeData.y;
         
         const color = c >= o ? '#00E396' : '#FF4560';
+        const risk = h - l;
+        const quantity = risk > 0 ? Math.floor(maxLoss / risk) : 0;
+        const capitalRequired = quantity * h;
+        const maxQuantity = h > 0 ? Math.floor(totalCapital*5 / h) : 0;
+        const actualLoss = maxQuantity * risk;
         
         return `
-          <div style="padding: 10px; background: #242424; border: 1px solid #444; color: #fff; font-family: sans-serif; font-size: 13px;">
-            <div style="margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 4px; text-align: center;">
+          <div style="padding: 10px; background: #000; border: 1px solid #333; color: #fff; font-family: sans-serif; font-size: 13px;">
+            <div style="margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 4px; text-align: center;">
               ${time}
             </div>
             <div style="display: flex; justify-content: space-between; gap: 16px;">
@@ -161,8 +166,23 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
             <div style="display: flex; justify-content: space-between; gap: 16px;">
               <span>Close:</span> <strong style="color: ${color};">${c.toFixed(2)}</strong>
             </div>
-            <div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; padding-top: 4px; border-top: 1px solid #444;">
+            <div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; padding-top: 4px; border-top: 1px solid #333;">
               <span>Volume:</span> <strong>${v.toLocaleString()}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 4px; padding-top: 4px; border-top: 1px solid #333;">
+              <span>Max Loss:</span> <strong>${maxLoss}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span>Qty to Buy:</span> <strong style="color: #00E396;">${quantity}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span>Capital Required:</span> <strong>${capitalRequired.toFixed(2)}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span>Max Qty:</span> <strong>${maxQuantity}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span>Actual Loss:</span> <strong style="color: #FF4560;">${actualLoss.toFixed(2)}</strong>
             </div>
           </div>
         `;
