@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Chart from 'react-apexcharts'
 
-export default function StockChart({ symbol, lastFetchTime, type }) {
+export default function StockChart({ symbol, lastFetchTime, type, isModal = false }) {
   const [chartData, setChartData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -16,7 +16,7 @@ export default function StockChart({ symbol, lastFetchTime, type }) {
     if (chartData.length === 0) {
       setLoading(true);
     }
-    fetch(`http://localhost:8000/api/candles/${symbol}`)
+    fetch(`http://192.168.1.12:8000/api/candles/${symbol}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch candle data")
         return res.json()
@@ -81,21 +81,38 @@ export default function StockChart({ symbol, lastFetchTime, type }) {
 
   const options = {
     chart: {
-      height: 250,
+      height: isModal ? 500 : 250,
       background: 'transparent',
-      toolbar: { show: false } // Hides the top right menu and zoom tools
+      toolbar: { show: true } // Hides the top right menu and zoom tools
     },
     grid: { 
       show: false // Removes background grid lines for a cleaner look
+    },
+    plotOptions: {
+      bar: {
+        columnWidth: '50%', // Thins out the volume bars to prevent horizontal overlap
+      },
+      candlestick: {
+        colors: {
+          upward: '#00E396',
+          downward: '#FF4560'
+        },
+        wick: {
+          useFillColor: true // Makes the wicks match the candle body color
+        }
+      }
+    },
+    stroke: {
+      width: [1, 0] // 1px stroke for candles to reduce bulkiness, 0px for volume bars
     },
     title: {
       text: undefined
     },
     xaxis: {
       type: 'datetime',
-      labels: { show: false }, // Hides the bottom time labels
-      axisBorder: { show: false },
-      axisTicks: { show: false }
+      labels: { show: isModal }, // Hides the bottom time labels unless in modal
+      axisBorder: { show: isModal },
+      axisTicks: { show: isModal }
     },
     yaxis: [
       {
@@ -181,7 +198,7 @@ export default function StockChart({ symbol, lastFetchTime, type }) {
       {loading && chartData.length === 0 && <p>Loading chart for {symbol}...</p>}
       {error && <p style={{ color: 'red' }}>Error loading chart: {error}</p>}
       {chartData.length > 0 && !error && (
-        <Chart options={options} series={chartData} type="line" height={250} />
+        <Chart options={options} series={chartData} type="line" height={isModal ? 500 : 250} />
       )}
     </>
   )

@@ -1,20 +1,15 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import requests
 import yfinance as yf
 
 app = FastAPI()
 
-# Allow requests from the React frontend (Vite usually runs on 5173, Create React App on 3000)
-origins = [
-    "http://localhost:5173",
-    "http://192.168.1.12:5173",
-    "http://localhost:3000",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -88,3 +83,46 @@ def get_candles(symbol: str):
         
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/api/sector-performance")
+def get_sector_performance():
+    url = "https://www.nseindia.com/api/allIndices"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    
+    session = requests.Session()
+    session.headers.update(headers)
+    
+    try:
+        # NSE requires a valid session cookie, so we visit the home page first
+        session.get("https://www.nseindia.com", timeout=10)
+        
+        response = session.get(url, timeout=10)
+        response.raise_for_status()
+        nse_data = response.json()
+        
+        all_indices = nse_data.get("data", [])
+        
+        # Filter for sectoral indices based on the 'key'
+        sectoral_indices_data = [
+            index for index in all_indices if index.get("key") == "SECTORAL INDICES"
+        ]
+        
+        # Safely parse percentage change and sort the sectoral indices
+        sorted_data = sorted(sectoral_indices_data, key=lambda x: float(x.get("percentChange", 0) or 0))
+        
+        return {
+            "top-gainer": sorted_data[-5:][::-1], # Last 5 items, reversed for highest to lowest
+            "top-losers": sorted_data[:5]         # First 5 items (lowest to highest)
+        }
+        
+    except Exception as e:
+        return {"error": str(e)}
+
+# Mount the React build (dist) folder to serve the UI
+ui_dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ui", "dist")
+if os.path.exists(ui_dist_path):
+    app.mount("/", StaticFiles(directory=ui_dist_path, html=True), name="ui")
