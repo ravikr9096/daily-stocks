@@ -12,8 +12,8 @@ function App() {
   const [sectorData, setSectorData] = useState(null)
   const [sectorLoading, setSectorLoading] = useState(true)
   const [sectorError, setSectorError] = useState(null)
-  const [maxLoss, setMaxLoss] = useState(1000)
-  const [totalCapital, setTotalCapital] = useState(100000)
+  const [maxLoss, setMaxLoss] = useState(1500)
+  const [totalCapital, setTotalCapital] = useState(20000)
 
   const fetchStocks = () => {
     fetch('http://192.168.1.12:8000/api/stocks')
