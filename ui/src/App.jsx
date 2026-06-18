@@ -74,25 +74,29 @@ function App() {
 
   return (
     <div className="App" style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', maxWidth: '1800px', margin: '0 auto', width: '100%', fontSize: '0.9rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1rem' }}>
-        <h2 style={{ display: 'flex', color: '#fff' }}>Market Overview</h2>
-        <div style={{ display: 'flex', alignItems: 'center', color: '#fff' }}>
-          <label htmlFor="max-loss" style={{ marginRight: '10px' }}>Maximum Loss (₹):</label>
-          <input
-            id="max-loss"
-            type="number"
-            value={maxLoss}
-            onChange={(e) => setMaxLoss(Number(e.target.value))}
-            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
-          />
-          <label htmlFor="total-capital" style={{ marginLeft: '20px', marginRight: '10px' }}>Total Capital (₹):</label>
-          <input
-            id="total-capital"
-            type="number"
-            value={totalCapital}
-            onChange={(e) => setTotalCapital(Number(e.target.value))}
-            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
-          />
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
+        <h2 style={{ margin: '0 0 10px 0', color: '#fff' }}>Market Overview</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', color: '#fff', gap: '15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <label htmlFor="max-loss" style={{ marginRight: '10px' }}>Maximum Loss (₹):</label>
+            <input
+              id="max-loss"
+              type="number"
+              value={maxLoss}
+              onChange={(e) => setMaxLoss(Number(e.target.value))}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <label htmlFor="total-capital" style={{ marginRight: '10px' }}>Total Capital (₹):</label>
+            <input
+              id="total-capital"
+              type="number"
+              value={totalCapital}
+              onChange={(e) => setTotalCapital(Number(e.target.value))}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
+            />
+          </div>
         </div>
       </div>
       
@@ -105,17 +109,17 @@ function App() {
           {/* Top Row (Advances & Sectors) */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
             
-            <div className="card" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
-                <div>
+            <div className="card" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ flex: '1 1 30%' }}>
                   <h4 style={{ margin: '0 0 0.5rem 0' }}>Advances</h4>
                   <p style={{ color: 'green', fontSize: '1.5rem', margin: 0 }}>{stocksData.advance?.advances}</p>
                 </div>
-                <div>
+                <div style={{ flex: '1 1 30%' }}>
                   <h4 style={{ margin: '0 0 0.5rem 0' }}>Declines</h4>
                   <p style={{ color: 'red', fontSize: '1.5rem', margin: 0 }}>{stocksData.advance?.declines}</p>
                 </div>
-                <div>
+                <div style={{ flex: '1 1 30%' }}>
                   <h4 style={{ margin: '0 0 0.5rem 0' }}>Unchanged</h4>
                   <p style={{ color: 'gray', fontSize: '1.5rem', margin: 0 }}>{stocksData.advance?.unchanged}</p>
                 </div>
@@ -124,7 +128,7 @@ function App() {
 
             {sectorData && !sectorData.error && (
               <>
-              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
+              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
                   <h3 style={{ marginTop: 0 }}>Top Sector Gainers</h3>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {sectorData['top-gainer']?.map((sector) => (
@@ -138,7 +142,7 @@ function App() {
                   </ul>
                 </div>
 
-              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
+              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
                   <h3 style={{ marginTop: 0 }}>Top Sector Losers</h3>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {sectorData['top-losers']?.map((sector) => (
@@ -157,7 +161,7 @@ function App() {
 
           {/* Bottom Row (Stocks) */}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div className="card" style={{ flex: 1, minWidth: '300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
+          <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
               <h3 style={{ marginTop: 0 }}>Top Gainers</h3>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {stocksData['top-gainer']?.map((stock) => (
@@ -176,7 +180,7 @@ function App() {
               </ul>
             </div>
 
-          <div className="card" style={{ flex: 1, minWidth: '300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem' }}>
+          <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
               <h3 style={{ marginTop: 0 }}>Top Losers</h3>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {stocksData['top-losers']?.map((stock) => (
@@ -214,13 +218,15 @@ function App() {
         >
           <div 
             style={{
-            background: '#111',
-              padding: '2rem',
+              background: '#111',
+              padding: '1rem',
               borderRadius: '8px',
-            border: '1px solid #333',
-              width: '90%',
+              border: '1px solid #333',
+              width: '95%',
               maxWidth: '1000px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+              maxHeight: '95vh',
+              overflowY: 'auto'
             }} 
             onClick={e => e.stopPropagation()}
           >
