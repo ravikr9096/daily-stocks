@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Chart from 'react-apexcharts'
+import { API_BASE_URL } from './config'
 
 export default function StockChart({ symbol, lastFetchTime, type, isModal = false, maxLoss = 1000, totalCapital = 100000 }) {
   const [chartData, setChartData] = useState([])
@@ -16,7 +17,7 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
     if (chartData.length === 0) {
       setLoading(true);
     }
-    fetch(`http://192.168.1.12:8000/api/candles/${symbol}`)
+    fetch(`${API_BASE_URL}/api/candles/${symbol}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch candle data")
         return res.json()

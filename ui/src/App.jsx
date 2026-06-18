@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import StockChart from './StockChart'
+import { API_BASE_URL } from './config'
 
 function App() {
   const [stocksData, setStocksData] = useState(null)
@@ -16,7 +17,7 @@ function App() {
   const [totalCapital, setTotalCapital] = useState(20000)
 
   const fetchStocks = () => {
-    fetch('http://192.168.1.12:8000/api/stocks')
+    fetch(`${API_BASE_URL}/api/stocks`)
       .then((response) => {
         if (!response.ok) throw new Error("Network response was not ok")
         return response.json()
@@ -35,7 +36,7 @@ function App() {
   }
 
   const fetchSectors = () => {
-    fetch('http://192.168.1.12:8000/api/sector-performance')
+    fetch(`${API_BASE_URL}/api/sector-performance`)
       .then((response) => {
         if (!response.ok) throw new Error("Network response was not ok")
         return response.json()
