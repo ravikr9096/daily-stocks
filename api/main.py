@@ -47,8 +47,8 @@ def get_stocks():
         
         return {
             "advance": advance,
-            "top-gainer": sorted_data[-5:][::-1], # Last 5 items, reversed for highest to lowest
-            "top-losers": sorted_data[:5]         # First 5 items (lowest to highest)
+            "top-gainer": sorted_data[-10:][::-1], # Last 5 items, reversed for highest to lowest
+            "top-losers": sorted_data[:10]         # First 5 items (lowest to highest)
         }
         
     except Exception as e:
