@@ -63,8 +63,8 @@ function App() {
     fetchSectors()
 
     // Set up polling every 1 minute (60000 ms)
-    const intervalId1 = setInterval(fetchStocks, 60000)
-    const intervalId2 = setInterval(fetchSectors, 60000)
+    const intervalId1 = setInterval(fetchStocks, 30000)
+    const intervalId2 = setInterval(fetchSectors, 30000)
 
     // Clean up the interval when the component unmounts
     return () => {
