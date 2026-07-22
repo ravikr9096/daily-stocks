@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 import StockChart from './StockChart'
+import StockList from './StockList'
+import SectorList from './SectorList'
 import { API_BASE_URL } from './config'
 
 function App() {
@@ -8,75 +10,98 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastFetchTime, setLastFetchTime] = useState(Date.now())
-  const [selectedSymbol, setSelectedSymbol] = useState(null)
-  const [selectedType, setSelectedType] = useState(null)
+  const [modalData, setModalData] = useState({ symbol: null, type: null })
   const [sectorData, setSectorData] = useState(null)
   const [sectorLoading, setSectorLoading] = useState(true)
   const [sectorError, setSectorError] = useState(null)
   const [maxLoss, setMaxLoss] = useState(1500)
   const [totalCapital, setTotalCapital] = useState(20000)
 
-  const fetchStocks = () => {
-    fetch(`${API_BASE_URL}/api/stocks`)
-      .then((response) => {
-        if (!response.ok) throw new Error("Network response was not ok")
-        return response.json()
-      })
-      .then((data) => {
-        setStocksData(data)
-        setLastFetchTime(Date.now())
-        setLoading(false)
-        setError(null)
-      })
-      .catch((error) => {
-        console.error("Error fetching data:", error)
-        setError(error.message)
-        setLoading(false)
-      })
-  }
-
-  const fetchSectors = () => {
-    fetch(`${API_BASE_URL}/api/sector-performance`)
-      .then((response) => {
-        if (!response.ok) throw new Error("Network response was not ok")
-        return response.json()
-      })
-      .then((data) => {
-        setSectorData(data)
-        setSectorLoading(false)
-        setSectorError(null)
-      })
-      .catch((error) => {
-        console.error("Error fetching sector data:", error)
-        setSectorError(error.message)
-        setSectorLoading(false)
-      })
-  }
-
   useEffect(() => {
     document.body.style.backgroundColor = '#000'
     document.body.style.color = '#fff'
     document.body.style.margin = '0'
 
-    // Initial fetch
-    fetchStocks()
-    fetchSectors()
+    let isMounted = true;
+    let timeoutId;
 
-    // Set up polling every 1 minute (60000 ms)
-    const intervalId1 = setInterval(fetchStocks, 30000)
-    const intervalId2 = setInterval(fetchSectors, 30000)
+    const fetchData = async () => {
+      try {
+        const [stocksResponse, sectorsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/stocks`),
+          fetch(`${API_BASE_URL}/api/sector-performance`)
+        ]);
 
-    // Clean up the interval when the component unmounts
+        if (!stocksResponse.ok) throw new Error("Failed to fetch stock data");
+        if (!sectorsResponse.ok) throw new Error("Failed to fetch sector data");
+
+        const stocks = await stocksResponse.json();
+        const sectors = await sectorsResponse.json();
+
+        if (isMounted) {
+          setStocksData(stocks);
+          setSectorData(sectors);
+          setLastFetchTime(Date.now());
+          setError(null);
+          setSectorError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message);
+          setSectorError(err.message);
+        }
+        console.error("Error fetching data:", err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          setSectorLoading(false);
+          // Schedule the next fetch
+          timeoutId = setTimeout(fetchData, 30000);
+        }
+      }
+    };
+
+    fetchData(); // Initial fetch
+
+    // Cleanup function
     return () => {
-      clearInterval(intervalId1)
-      clearInterval(intervalId2)
+      isMounted = false;
+      clearTimeout(timeoutId);
     }
   }, [])
+
+  const handleMaxLossChange = useCallback((e) => {
+    setMaxLoss(Number(e.target.value));
+  }, []);
+
+  const handleTotalCapitalChange = useCallback((e) => {
+    setTotalCapital(Number(e.target.value));
+  }, []);
+
+  const handleStockClick = useCallback((symbol, type) => {
+    // On mobile, we want to allow chart interaction (like showing tooltips on tap)
+    // without immediately opening the modal. The modal remains for desktop clicks.
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) return;
+    setModalData({ symbol, type });
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    setLoading(true);
+    setSectorLoading(true);
+    // The useEffect cleanup/re-run logic will handle the fetch,
+    // but we can force an immediate one by changing a dependency or creating a dedicated function.
+    // For simplicity, let's just update the fetch time to trigger children updates.
+    // A more robust implementation might involve a dedicated fetch function outside useEffect.
+    setLastFetchTime(Date.now());
+  }, []);
 
   return (
     <div className="App" style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', maxWidth: '1800px', margin: '0 auto', width: '100%', fontSize: '0.9rem' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
-        <h2 style={{ margin: '0 0 10px 0', color: '#fff' }}>Market Overview</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h2 style={{ margin: '0', color: '#fff' }}>Market Overview</h2>
+        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', color: '#fff', gap: '15px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <label htmlFor="max-loss" style={{ marginRight: '10px' }}>Maximum Loss (₹):</label>
@@ -84,7 +109,7 @@ function App() {
               id="max-loss"
               type="number"
               value={maxLoss}
-              onChange={(e) => setMaxLoss(Number(e.target.value))}
+              onChange={handleMaxLossChange}
               style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
             />
           </div>
@@ -94,10 +119,17 @@ function App() {
               id="total-capital"
               type="number"
               value={totalCapital}
-              onChange={(e) => setTotalCapital(Number(e.target.value))}
+              onChange={handleTotalCapitalChange}
               style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
             />
           </div>
+          <button 
+            onClick={handleRefresh} 
+            disabled={loading}
+            style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: '#fff', cursor: 'pointer' }}
+          >
+            {loading ? 'Refreshing...' : 'Refresh Now'}
+          </button>
         </div>
       </div>
       
@@ -129,82 +161,38 @@ function App() {
 
             {sectorData && !sectorData.error && (
               <>
-              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
-                  <h3 style={{ marginTop: 0 }}>Top Sector Gainers</h3>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {sectorData['top-gainer']?.map((sector) => (
-                    <li key={sector.index} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong>{sector.index}</strong>
-                          <span style={{ color: 'green' }}>+{sector.percentChange}%</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-              <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
-                  <h3 style={{ marginTop: 0 }}>Top Sector Losers</h3>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {sectorData['top-losers']?.map((sector) => (
-                    <li key={sector.index} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong>{sector.index}</strong>
-                          <span style={{ color: 'red' }}>{sector.percentChange}%</span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <SectorList title="Top Sector Gainers" sectors={sectorData['top-gainer']} type="gainer" />
+                <SectorList title="Top Sector Losers" sectors={sectorData['top-losers']} type="loser" />
               </>
             )}
           </div>
 
           {/* Bottom Row (Stocks) */}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
-              <h3 style={{ marginTop: 0 }}>Top Gainers</h3>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {stocksData['top-gainer']?.map((stock) => (
-                  <li 
-                    key={stock.symbol}
-                  style={{ padding: '0.5rem', borderBottom: '1px solid #333', cursor: 'pointer' }}
-                    onClick={() => { setSelectedSymbol(stock.symbol); setSelectedType('gainer') }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                      <strong>{stock.symbol}</strong>
-                      <span style={{ color: 'green' }}>+{stock.pChange}%</span>
-                    </div>
-                    <StockChart symbol={stock.symbol} lastFetchTime={lastFetchTime} type="gainer" maxLoss={maxLoss} totalCapital={totalCapital} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-          <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
-              <h3 style={{ marginTop: 0 }}>Top Losers</h3>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {stocksData['top-losers']?.map((stock) => (
-                  <li 
-                    key={stock.symbol}
-                  style={{ padding: '0.5rem', borderBottom: '1px solid #333', cursor: 'pointer' }}
-                    onClick={() => { setSelectedSymbol(stock.symbol); setSelectedType('loser') }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                      <strong>{stock.symbol}</strong>
-                      <span style={{ color: 'red' }}>{stock.pChange}%</span>
-                    </div>
-                    <StockChart symbol={stock.symbol} lastFetchTime={lastFetchTime} type="loser" maxLoss={maxLoss} totalCapital={totalCapital} />
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <StockList
+              title="Top Gainers"
+              stocks={stocksData['top-gainer']}
+              type="gainer"
+              onStockClick={handleStockClick}
+              lastFetchTime={lastFetchTime}
+              maxLoss={maxLoss}
+              totalCapital={totalCapital}
+            />
+            <StockList
+              title="Top Losers"
+              stocks={stocksData['top-losers']}
+              type="loser"
+              onStockClick={handleStockClick}
+              lastFetchTime={lastFetchTime}
+              maxLoss={maxLoss}
+              totalCapital={totalCapital}
+            />
           </div>
 
         </div>
       )}
 
-      {selectedSymbol && (
+      {modalData.symbol && (
         <div 
           style={{
             position: 'fixed',
@@ -215,7 +203,7 @@ function App() {
             justifyContent: 'center',
             zIndex: 1000
           }} 
-          onClick={() => setSelectedSymbol(null)}
+          onClick={() => setModalData({ symbol: null, type: null })}
         >
           <div 
             style={{
@@ -232,10 +220,10 @@ function App() {
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0 }}>{selectedSymbol}</h2>
-              <button onClick={() => setSelectedSymbol(null)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '2rem', cursor: 'pointer' }}>&times;</button>
+              <h2 style={{ margin: 0 }}>{modalData.symbol}</h2>
+              <button onClick={() => setModalData({ symbol: null, type: null })} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '2rem', cursor: 'pointer' }}>&times;</button>
             </div>
-            <StockChart symbol={selectedSymbol} lastFetchTime={lastFetchTime} type={selectedType} isModal={true} maxLoss={maxLoss} totalCapital={totalCapital} />
+            <StockChart symbol={modalData.symbol} lastFetchTime={lastFetchTime} type={modalData.type} isModal={true} maxLoss={maxLoss} totalCapital={totalCapital} />
           </div>
         </div>
       )}

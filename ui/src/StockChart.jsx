@@ -84,7 +84,11 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
     chart: {
       height: isModal ? 500 : 250,
       background: 'transparent',
-      toolbar: { show: true } // Hides the top right menu and zoom tools
+      toolbar: { show: isModal }, // Only show toolbar in modal
+      events: {
+        // This allows the parent li's onClick to fire for non-touch devices
+        click: (event, chartContext, config) => event.target.parentElement.parentElement.dispatchEvent(new Event('click', { bubbles: true }))
+      }
     },
     grid: { 
       show: false // Removes background grid lines for a cleaner look
@@ -132,6 +136,7 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
     dataLabels: { enabled: false },
     legend: { show: false },
     tooltip: {
+      enabledOnSeries: undefined, // Ensure tooltip is enabled for all series
       shared: true,
       custom: function ({ dataPointIndex, w }) {
         const candleData = w.config.series[0].data[dataPointIndex];
@@ -219,7 +224,9 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
       {loading && chartData.length === 0 && <p>Loading chart for {symbol}...</p>}
       {error && <p style={{ color: 'red' }}>Error loading chart: {error}</p>}
       {chartData.length > 0 && !error && (
-        <Chart options={options} series={chartData} type="line" height={isModal ? 500 : 250} />
+        <div style={{ pointerEvents: 'auto' }}>
+          <Chart options={options} series={chartData} type="line" height={isModal ? 500 : 250} />
+        </div>
       )}
     </>
   )
