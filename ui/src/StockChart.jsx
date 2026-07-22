@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Chart from 'react-apexcharts'
 import { API_BASE_URL } from './config'
 
-export default function StockChart({ symbol, lastFetchTime, type, isModal = false, maxLoss = 1000, totalCapital = 100000 }) {
+export default function StockChart({ symbol, lastFetchTime, type, isModal = false, maxLoss = 1000, totalCapital = 100000, lowVolBarsBefore = 2, onHighlightCheck }) {
   const [chartData, setChartData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -67,6 +67,22 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
           }
         }
         setTargetAnnotation(target);
+
+        // Highlight check for low volume candle
+        if (onHighlightCheck && data.candles.length > lowVolBarsBefore) {
+          const checkIndex = data.candles.length - 1 - lowVolBarsBefore;
+          const candleToCheck = data.candles[checkIndex];
+          
+          // Find the lowest volume in the entire series to determine what "low" means
+          const volumes = data.candles.map(c => c.volume);
+          const lowestVolume = Math.min(...volumes.filter(v => v > 0)); // Exclude zero volume
+
+          // A candle is "low volume" if it's in the bottom 10% of volume for this stock's day
+          const volumeThreshold = lowestVolume * 1.1; 
+
+          const shouldHighlight = candleToCheck.volume > 0 && candleToCheck.volume <= volumeThreshold;
+          onHighlightCheck(symbol, shouldHighlight);
+        }
         
         setChartData([candleSeries, volumeSeries])
         setLoading(false)
@@ -76,7 +92,7 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
         setError(err.message)
         setLoading(false)
       })
-  }, [symbol, lastFetchTime])
+  }, [symbol, lastFetchTime, lowVolBarsBefore, onHighlightCheck])
 
   if (!symbol) return null;
 

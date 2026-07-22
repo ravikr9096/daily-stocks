@@ -16,6 +16,7 @@ function App() {
   const [sectorError, setSectorError] = useState(null)
   const [maxLoss, setMaxLoss] = useState(1500)
   const [totalCapital, setTotalCapital] = useState(20000)
+  const [lowVolBarsBefore, setLowVolBarsBefore] = useState(2)
 
   useEffect(() => {
     document.body.style.backgroundColor = '#000'
@@ -96,6 +97,10 @@ function App() {
     setLastFetchTime(Date.now());
   }, []);
 
+  const handleLowVolBarsBeforeChange = useCallback((e) => {
+    setLowVolBarsBefore(Number(e.target.value));
+  }, []);
+
   return (
     <div className="App" style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', maxWidth: '1800px', margin: '0 auto', width: '100%', fontSize: '0.9rem' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
@@ -121,6 +126,16 @@ function App() {
               value={totalCapital}
               onChange={handleTotalCapitalChange}
               style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <label htmlFor="low-vol-bars-before" style={{ marginRight: '10px' }}>Low Vol Bars Before:</label>
+            <input
+              id="low-vol-bars-before"
+              type="number"
+              value={lowVolBarsBefore}
+              onChange={handleLowVolBarsBeforeChange}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '60px' }}
             />
           </div>
           <button 
@@ -177,6 +192,7 @@ function App() {
               lastFetchTime={lastFetchTime}
               maxLoss={maxLoss}
               totalCapital={totalCapital}
+              lowVolBarsBefore={lowVolBarsBefore}
             />
             <StockList
               title="Top Losers"
@@ -186,6 +202,7 @@ function App() {
               lastFetchTime={lastFetchTime}
               maxLoss={maxLoss}
               totalCapital={totalCapital}
+              lowVolBarsBefore={lowVolBarsBefore}
             />
           </div>
 
