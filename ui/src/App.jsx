@@ -1,105 +1,36 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import './App.css'
 import StockChart from './StockChart'
 import StockList from './StockList'
 import SectorList from './SectorList'
-import { API_BASE_URL } from './config'
+import { useMarketData } from './useMarketData'
 
 function App() {
-  const [stocksData, setStocksData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [lastFetchTime, setLastFetchTime] = useState(Date.now())
+  const { marketData, loading, error, lastFetchTime, forceRefresh } = useMarketData();
   const [modalData, setModalData] = useState({ symbol: null, type: null })
-  const [sectorData, setSectorData] = useState(null)
-  const [sectorLoading, setSectorLoading] = useState(true)
-  const [sectorError, setSectorError] = useState(null)
   const [maxLoss, setMaxLoss] = useState(1500)
   const [totalCapital, setTotalCapital] = useState(20000)
   const [lowVolBarsBefore, setLowVolBarsBefore] = useState(2)
 
-  useEffect(() => {
-    document.body.style.backgroundColor = '#000'
-    document.body.style.color = '#fff'
-    document.body.style.margin = '0'
-
-    let isMounted = true;
-    let timeoutId;
-
-    const fetchData = async () => {
-      try {
-        const [stocksResponse, sectorsResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/stocks`),
-          fetch(`${API_BASE_URL}/api/sector-performance`)
-        ]);
-
-        if (!stocksResponse.ok) throw new Error("Failed to fetch stock data");
-        if (!sectorsResponse.ok) throw new Error("Failed to fetch sector data");
-
-        const stocks = await stocksResponse.json();
-        const sectors = await sectorsResponse.json();
-
-        if (isMounted) {
-          setStocksData(stocks);
-          setSectorData(sectors);
-          setLastFetchTime(Date.now());
-          setError(null);
-          setSectorError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.message);
-          setSectorError(err.message);
-        }
-        console.error("Error fetching data:", err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          setSectorLoading(false);
-          // Schedule the next fetch
-          timeoutId = setTimeout(fetchData, 30000);
-        }
-      }
-    };
-
-    fetchData(); // Initial fetch
-
-    // Cleanup function
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    }
-  }, [])
-
   const handleMaxLossChange = useCallback((e) => {
     setMaxLoss(Number(e.target.value));
   }, []);
-
+  
   const handleTotalCapitalChange = useCallback((e) => {
     setTotalCapital(Number(e.target.value));
   }, []);
-
+  
   const handleStockClick = useCallback((symbol, type) => {
-    // On mobile, we want to allow chart interaction (like showing tooltips on tap)
-    // without immediately opening the modal. The modal remains for desktop clicks.
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     if (isTouchDevice) return;
     setModalData({ symbol, type });
   }, []);
-
-  const handleRefresh = useCallback(() => {
-    setLoading(true);
-    setSectorLoading(true);
-    // The useEffect cleanup/re-run logic will handle the fetch,
-    // but we can force an immediate one by changing a dependency or creating a dedicated function.
-    // For simplicity, let's just update the fetch time to trigger children updates.
-    // A more robust implementation might involve a dedicated fetch function outside useEffect.
-    setLastFetchTime(Date.now());
-  }, []);
-
+  
   const handleLowVolBarsBeforeChange = useCallback((e) => {
     setLowVolBarsBefore(Number(e.target.value));
   }, []);
+
+  const { stocksData, sectorData } = marketData || {};
 
   return (
     <div className="App" style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', maxWidth: '1800px', margin: '0 auto', width: '100%', fontSize: '0.9rem' }}>
@@ -108,6 +39,7 @@ function App() {
           <h2 style={{ margin: '0', color: '#fff' }}>Market Overview</h2>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', color: '#fff', gap: '15px' }}>
+          {/* Input controls remain the same */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <label htmlFor="max-loss" style={{ marginRight: '10px' }}>Maximum Loss (₹):</label>
             <input
@@ -139,7 +71,7 @@ function App() {
             />
           </div>
           <button 
-            onClick={handleRefresh} 
+            onClick={forceRefresh} 
             disabled={loading}
             style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: '#fff', cursor: 'pointer' }}
           >
@@ -148,7 +80,7 @@ function App() {
         </div>
       </div>
       
-      {loading && !stocksData && <p>Loading market data...</p>}
+      {loading && !marketData && <p>Loading market data...</p>}
       {error && <p style={{ color: 'red' }}>Error: {error}</p>}
 
       {stocksData && !stocksData.error && (
@@ -240,7 +172,14 @@ function App() {
               <h2 style={{ margin: 0 }}>{modalData.symbol}</h2>
               <button onClick={() => setModalData({ symbol: null, type: null })} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '2rem', cursor: 'pointer' }}>&times;</button>
             </div>
-            <StockChart symbol={modalData.symbol} lastFetchTime={lastFetchTime} type={modalData.type} isModal={true} maxLoss={maxLoss} totalCapital={totalCapital} />
+            <StockChart 
+              symbol={modalData.symbol} 
+              lastFetchTime={lastFetchTime}
+              type={modalData.type} 
+              isModal={true} 
+              maxLoss={maxLoss} 
+              totalCapital={totalCapital} 
+            />
           </div>
         </div>
       )}

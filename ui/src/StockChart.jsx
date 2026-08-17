@@ -24,6 +24,13 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
       })
       .then((data) => {
         if (data.error) throw new Error(data.error)
+    
+        if (!data || !data.candles) {
+          setChartData([]);
+          setLoading(false);
+          setError(null);
+          return;
+        }
         
         const candleSeries = {
           name: 'Price',
@@ -92,7 +99,7 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
         setError(err.message)
         setLoading(false)
       })
-  }, [symbol, lastFetchTime, lowVolBarsBefore, onHighlightCheck])
+  }, [symbol, lastFetchTime, type, lowVolBarsBefore, onHighlightCheck])
 
   if (!symbol) return null;
 
@@ -102,7 +109,7 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
       background: 'transparent',
       toolbar: { show: isModal }, // Only show toolbar in modal
       events: {
-        // This allows the parent li's onClick to fire for non-touch devices
+        // This allows the parent li's onClick to fire
         click: (event, chartContext, config) => event.target.parentElement.parentElement.dispatchEvent(new Event('click', { bubbles: true }))
       }
     },
@@ -239,11 +246,11 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
     <>
       {loading && chartData.length === 0 && <p>Loading chart for {symbol}...</p>}
       {error && <p style={{ color: 'red' }}>Error loading chart: {error}</p>}
-      {chartData.length > 0 && !error && (
+      {chartData.length > 0 && !error ? (
         <div style={{ pointerEvents: 'auto' }}>
           <Chart options={options} series={chartData} type="line" height={isModal ? 500 : 250} />
         </div>
-      )}
+      ) : null}
     </>
   )
 }

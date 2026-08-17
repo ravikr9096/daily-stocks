@@ -20,7 +20,6 @@ const StockList = ({ title, stocks, type, onStockClick, lastFetchTime, maxLoss, 
               padding: '0.5rem', 
               borderBottom: '1px solid #333', 
               cursor: 'pointer', 
-              pointerEvents: 'none',
               ...(highlightedStocks[stock.symbol] && { 
                 border: '2px solid #ffc107', 
                 borderRadius: '4px', 
@@ -35,8 +34,8 @@ const StockList = ({ title, stocks, type, onStockClick, lastFetchTime, maxLoss, 
             </div>
             <StockChart 
               symbol={stock.symbol} 
-              lastFetchTime={lastFetchTime} 
-              type={type} 
+              lastFetchTime={lastFetchTime}
+              type={type}
               maxLoss={maxLoss} 
               totalCapital={totalCapital}
               lowVolBarsBefore={lowVolBarsBefore}
