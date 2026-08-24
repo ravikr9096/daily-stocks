@@ -244,8 +244,13 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
 
   return (
     <>
-      {loading && chartData.length === 0 && <p>Loading chart for {symbol}...</p>}
-      {error && <p style={{ color: 'red' }}>Error loading chart: {error}</p>}
+      {loading && chartData.length === 0 && (
+        <div className="chart-loading">
+          <span className="live-dot" />
+          Loading {symbol}…
+        </div>
+      )}
+      {error && <p className="chart-error">Error loading chart: {error}</p>}
       {chartData.length > 0 && !error ? (
         <div style={{ pointerEvents: 'auto' }}>
           <Chart options={options} series={chartData} type="line" height={isModal ? 500 : 250} />

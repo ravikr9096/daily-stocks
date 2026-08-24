@@ -5,6 +5,68 @@ import StockList from './StockList'
 import SectorList from './SectorList'
 import { useMarketData } from './useMarketData'
 
+function formatLastUpdated(timestamp) {
+  if (!timestamp) return '';
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function MarketBreadth({ advance }) {
+  const advances = advance?.advances ?? 0;
+  const declines = advance?.declines ?? 0;
+  const unchanged = advance?.unchanged ?? 0;
+  const total = advances + declines + unchanged || 1;
+
+  return (
+    <div className="card breadth-card">
+      <div className="card-header">
+        <h3 className="card-title">
+          <span className="card-title-dot card-title-dot--neutral" />
+          Market Breadth
+        </h3>
+        <span className="card-count">{total} stocks</span>
+      </div>
+
+      <div className="breadth-stats">
+        <div className="breadth-stat">
+          <div className="breadth-stat-label">Advances</div>
+          <div className="breadth-stat-value breadth-stat-value--gain">{advances}</div>
+        </div>
+        <div className="breadth-stat">
+          <div className="breadth-stat-label">Declines</div>
+          <div className="breadth-stat-value breadth-stat-value--loss">{declines}</div>
+        </div>
+        <div className="breadth-stat">
+          <div className="breadth-stat-label">Unchanged</div>
+          <div className="breadth-stat-value breadth-stat-value--neutral">{unchanged}</div>
+        </div>
+      </div>
+
+      <div className="breadth-bar">
+        <div
+          className="breadth-bar-segment breadth-bar-segment--gain"
+          style={{ width: `${(advances / total) * 100}%` }}
+        />
+        <div
+          className="breadth-bar-segment breadth-bar-segment--neutral"
+          style={{ width: `${(unchanged / total) * 100}%` }}
+        />
+        <div
+          className="breadth-bar-segment breadth-bar-segment--loss"
+          style={{ width: `${(declines / total) * 100}%` }}
+        />
+      </div>
+      <div className="breadth-ratio">
+        <span>{Math.round((advances / total) * 100)}% advancing</span>
+        <span>{Math.round((declines / total) * 100)}% declining</span>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const { marketData, loading, error, lastFetchTime, forceRefresh } = useMarketData();
   const [modalData, setModalData] = useState({ symbol: null, type: null })
@@ -15,17 +77,17 @@ function App() {
   const handleMaxLossChange = useCallback((e) => {
     setMaxLoss(Number(e.target.value));
   }, []);
-  
+
   const handleTotalCapitalChange = useCallback((e) => {
     setTotalCapital(Number(e.target.value));
   }, []);
-  
+
   const handleStockClick = useCallback((symbol, type) => {
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     if (isTouchDevice) return;
     setModalData({ symbol, type });
   }, []);
-  
+
   const handleLowVolBarsBeforeChange = useCallback((e) => {
     setLowVolBarsBefore(Number(e.target.value));
   }, []);
@@ -33,78 +95,87 @@ function App() {
   const { stocksData, sectorData } = marketData || {};
 
   return (
-    <div className="App" style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', maxWidth: '1800px', margin: '0 auto', width: '100%', fontSize: '0.9rem' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', padding: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h2 style={{ margin: '0', color: '#fff' }}>Market Overview</h2>
+    <div className="app">
+      <header className="app-header">
+        <div className="header-brand">
+          <h1 className="header-title">
+            <span className="header-title-icon">DS</span>
+            Daily Stocks
+          </h1>
+          <div className="header-meta">
+            <span className="header-subtitle">NSE F&O — Top movers & sector performance</span>
+            {lastFetchTime && (
+              <span>Updated {formatLastUpdated(lastFetchTime)}</span>
+            )}
+            <span className={`live-badge ${loading ? 'loading' : ''}`}>
+              <span className="live-dot" />
+              {loading ? 'Syncing' : 'Live'}
+            </span>
+          </div>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', color: '#fff', gap: '15px' }}>
-          {/* Input controls remain the same */}
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <label htmlFor="max-loss" style={{ marginRight: '10px' }}>Maximum Loss (₹):</label>
+
+        <div className="controls-panel">
+          <div className="control-group">
+            <label htmlFor="max-loss">Max Loss (₹)</label>
             <input
               id="max-loss"
+              className="control-input"
               type="number"
               value={maxLoss}
               onChange={handleMaxLossChange}
-              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <label htmlFor="total-capital" style={{ marginRight: '10px' }}>Total Capital (₹):</label>
+          <div className="control-group">
+            <label htmlFor="total-capital">Capital (₹)</label>
             <input
               id="total-capital"
+              className="control-input"
               type="number"
               value={totalCapital}
               onChange={handleTotalCapitalChange}
-              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '100px' }}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <label htmlFor="low-vol-bars-before" style={{ marginRight: '10px' }}>Low Vol Bars Before:</label>
+          <div className="control-group">
+            <label htmlFor="low-vol-bars-before">Low Vol Bars</label>
             <input
               id="low-vol-bars-before"
+              className="control-input control-input--narrow"
               type="number"
               value={lowVolBarsBefore}
               onChange={handleLowVolBarsBeforeChange}
-              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #333', background: '#000', color: '#fff', width: '60px' }}
             />
           </div>
-          <button 
-            onClick={forceRefresh} 
+          <button
+            className="btn btn-primary"
+            onClick={forceRefresh}
             disabled={loading}
-            style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: '#fff', cursor: 'pointer' }}
           >
-            {loading ? 'Refreshing...' : 'Refresh Now'}
+            {loading ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
-      </div>
-      
-      {loading && !marketData && <p>Loading market data...</p>}
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+      </header>
+
+      {loading && !marketData && (
+        <div className="loading-skeleton">
+          <div className="skeleton-card" />
+          <div className="row">
+            <div className="skeleton-card" style={{ flex: 1 }} />
+            <div className="skeleton-card" style={{ flex: 1 }} />
+          </div>
+          <div className="skeleton-card skeleton-card--tall" />
+        </div>
+      )}
+
+      {error && (
+        <div className="status-banner status-banner--error">
+          Failed to load market data: {error}
+        </div>
+      )}
 
       {stocksData && !stocksData.error && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1rem' }}>
-          
-          {/* Top Row (Advances & Sectors) */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-            
-            <div className="card" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ flex: '1 1 30%' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0' }}>Advances</h4>
-                  <p style={{ color: 'green', fontSize: '1.5rem', margin: 0 }}>{stocksData.advance?.advances}</p>
-                </div>
-                <div style={{ flex: '1 1 30%' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0' }}>Declines</h4>
-                  <p style={{ color: 'red', fontSize: '1.5rem', margin: 0 }}>{stocksData.advance?.declines}</p>
-                </div>
-                <div style={{ flex: '1 1 30%' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0' }}>Unchanged</h4>
-                  <p style={{ color: 'gray', fontSize: '1.5rem', margin: 0 }}>{stocksData.advance?.unchanged}</p>
-                </div>
-              </div>
-            </div>
+        <main className="app-main">
+          <div className="row">
+            <MarketBreadth advance={stocksData.advance} />
 
             {sectorData && !sectorData.error && (
               <>
@@ -114,8 +185,7 @@ function App() {
             )}
           </div>
 
-          {/* Bottom Row (Stocks) */}
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="row row--stocks">
             <StockList
               title="Top Gainers"
               stocks={stocksData['top-gainer']}
@@ -137,49 +207,40 @@ function App() {
               lowVolBarsBefore={lowVolBarsBefore}
             />
           </div>
-
-        </div>
+        </main>
       )}
 
       {modalData.symbol && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }} 
+        <div
+          className="modal-overlay"
           onClick={() => setModalData({ symbol: null, type: null })}
         >
-          <div 
-            style={{
-              background: '#111',
-              padding: '1rem',
-              borderRadius: '8px',
-              border: '1px solid #333',
-              width: '95%',
-              maxWidth: '1000px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-              maxHeight: '95vh',
-              overflowY: 'auto'
-            }} 
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0 }}>{modalData.symbol}</h2>
-              <button onClick={() => setModalData({ symbol: null, type: null })} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '2rem', cursor: 'pointer' }}>&times;</button>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h2 className="modal-symbol">{modalData.symbol}</h2>
+                <span className={`modal-type-badge modal-type-badge--${modalData.type}`}>
+                  {modalData.type}
+                </span>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setModalData({ symbol: null, type: null })}
+                aria-label="Close chart"
+              >
+                ×
+              </button>
             </div>
-            <StockChart 
-              symbol={modalData.symbol} 
-              lastFetchTime={lastFetchTime}
-              type={modalData.type} 
-              isModal={true} 
-              maxLoss={maxLoss} 
-              totalCapital={totalCapital} 
-            />
+            <div className="modal-body">
+              <StockChart
+                symbol={modalData.symbol}
+                lastFetchTime={lastFetchTime}
+                type={modalData.type}
+                isModal={true}
+                maxLoss={maxLoss}
+                totalCapital={totalCapital}
+              />
+            </div>
           </div>
         </div>
       )}

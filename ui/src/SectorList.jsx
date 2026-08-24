@@ -1,20 +1,43 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 
 const SectorList = ({ title, sectors, type }) => {
-  const titleColor = type === 'gainer' ? 'green' : 'red';
+  const maxAbsChange = useMemo(() => {
+    if (!sectors?.length) return 1;
+    return Math.max(...sectors.map(s => Math.abs(parseFloat(s.percentChange) || 0)), 0.01);
+  }, [sectors]);
 
   return (
-    <div className="card" style={{ flex: '1 1 300px', background: '#111', border: '1px solid #333', borderRadius: '8px', padding: '1rem', maxWidth: '100%' }}>
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {sectors?.map((sector) => (
-          <li key={sector.index} style={{ padding: '0.25rem 0', borderBottom: '1px solid #333' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>{sector.index}</strong>
-              <span style={{ color: titleColor }}>{type === 'gainer' ? '+' : ''}{sector.percentChange}%</span>
-            </div>
-          </li>
-        ))}
+    <div className="card list-card">
+      <div className="card-header">
+        <h3 className="card-title">
+          <span className={`card-title-dot card-title-dot--${type === 'gainer' ? 'gain' : 'loss'}`} />
+          {title}
+        </h3>
+        <span className="card-count">{sectors?.length ?? 0} sectors</span>
+      </div>
+
+      <ul className="list-items">
+        {sectors?.map((sector) => {
+          const change = parseFloat(sector.percentChange) || 0;
+          const barWidth = Math.min((Math.abs(change) / maxAbsChange) * 100, 100);
+
+          return (
+            <li key={sector.index} className="sector-item">
+              <div className="sector-row">
+                <strong className="sector-name">{sector.index}</strong>
+                <span className={`change-badge change-badge--${type === 'gainer' ? 'gain' : 'loss'}`}>
+                  {type === 'gainer' ? '+' : ''}{sector.percentChange}%
+                </span>
+              </div>
+              <div className="sector-bar-track">
+                <div
+                  className={`sector-bar-fill sector-bar-fill--${type === 'gainer' ? 'gain' : 'loss'}`}
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
