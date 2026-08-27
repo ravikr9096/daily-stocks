@@ -13,25 +13,29 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
   useEffect(() => {
     if (!symbol) return;
 
-    // Only show the hard loading state if we have no chart data yet
+    const abortController = new AbortController();
+    let cancelled = false;
+
     if (chartData.length === 0) {
       setLoading(true);
     }
-    fetch(`${API_BASE_URL}/api/candles/${symbol}`)
+
+    fetch(`${API_BASE_URL}/api/candles/${symbol}`, { signal: abortController.signal })
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch candle data")
-        return res.json()
+        if (!res.ok) throw new Error('Failed to fetch candle data');
+        return res.json();
       })
       .then((data) => {
-        if (data.error) throw new Error(data.error)
-    
+        if (cancelled) return;
+        if (data.error) throw new Error(data.error);
+
         if (!data || !data.candles) {
           setChartData([]);
           setLoading(false);
           setError(null);
           return;
         }
-        
+
         const candleSeries = {
           name: 'Price',
           type: 'candlestick',
@@ -39,8 +43,8 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
             x: new Date(candle.timestamp),
             y: [candle.open, candle.high, candle.low, candle.close]
           }))
-        }
-        
+        };
+
         const volumeSeries = {
           name: 'Volume',
           type: 'bar',
@@ -49,18 +53,16 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
             y: candle.volume,
             fillColor: candle.close >= candle.open ? '#00E396' : '#FF4560'
           }))
-        }
-        
-        const maxV = Math.max(...data.candles.map(c => c.volume))
-        setMaxVolume(maxV)
+        };
 
-        // Calculate price padding so candles don't overlap with volume at the bottom
-        const minP = Math.min(...data.candles.map(c => c.low))
-        const maxP = Math.max(...data.candles.map(c => c.high))
-        const pRange = maxP - minP
-        setMinPrice(minP - (pRange > 0 ? pRange * 0.4 : minP * 0.05))
+        const maxV = Math.max(...data.candles.map(c => c.volume));
+        setMaxVolume(maxV);
 
-        // Find the specific candle to highlight based on the stock type
+        const minP = Math.min(...data.candles.map(c => c.low));
+        const maxP = Math.max(...data.candles.map(c => c.high));
+        const pRange = maxP - minP;
+        setMinPrice(minP - (pRange > 0 ? pRange * 0.4 : minP * 0.05));
+
         let target = null;
         if (type === 'gainer') {
           const redCandles = data.candles.filter(c => c.close < c.open);
@@ -75,30 +77,32 @@ export default function StockChart({ symbol, lastFetchTime, type, isModal = fals
         }
         setTargetAnnotation(target);
 
-        // Highlight check for low volume candle
         if (onHighlightCheck && data.candles.length > lowVolBarsBefore) {
           const checkIndex = data.candles.length - 1 - lowVolBarsBefore;
           const candleToCheck = data.candles[checkIndex];
-          
-          // Find the lowest volume in the entire series to determine what "low" means
-          const volumes = data.candles.map(c => c.volume);
-          const lowestVolume = Math.min(...volumes.filter(v => v > 0)); // Exclude zero volume
 
-          // A candle is "low volume" if it's in the bottom 10% of volume for this stock's day
-          const volumeThreshold = lowestVolume * 1.1; 
+          const volumes = data.candles.map(c => c.volume);
+          const lowestVolume = Math.min(...volumes.filter(v => v > 0));
+          const volumeThreshold = lowestVolume * 1.1;
 
           const shouldHighlight = candleToCheck.volume > 0 && candleToCheck.volume <= volumeThreshold;
           onHighlightCheck(symbol, shouldHighlight);
         }
-        
-        setChartData([candleSeries, volumeSeries])
-        setLoading(false)
-        setError(null)
+
+        setChartData([candleSeries, volumeSeries]);
+        setLoading(false);
+        setError(null);
       })
       .catch((err) => {
-        setError(err.message)
-        setLoading(false)
-      })
+        if (cancelled || err.name === 'AbortError') return;
+        setError(err.message);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      abortController.abort();
+    };
   }, [symbol, lastFetchTime, type, lowVolBarsBefore, onHighlightCheck])
 
   if (!symbol) return null;

@@ -68,7 +68,7 @@ function MarketBreadth({ advance }) {
 }
 
 function App() {
-  const { marketData, loading, error, lastFetchTime, forceRefresh } = useMarketData();
+  const { marketData, loading, sectorsLoading, error, lastFetchTime, forceRefresh } = useMarketData();
   const [modalData, setModalData] = useState({ symbol: null, type: null })
   const [maxLoss, setMaxLoss] = useState(1500)
   const [totalCapital, setTotalCapital] = useState(20000)
@@ -176,6 +176,15 @@ function App() {
         <main className="app-main">
           <div className="row">
             <MarketBreadth advance={stocksData.advance} />
+
+            {sectorsLoading && !sectorData && (
+              <div className="card list-card" style={{ flex: '1 1 300px' }}>
+                <div className="chart-loading">
+                  <span className="live-dot" />
+                  Loading sector data…
+                </div>
+              </div>
+            )}
 
             {sectorData && !sectorData.error && (
               <>
