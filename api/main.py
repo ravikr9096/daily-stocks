@@ -273,16 +273,27 @@ async def get_stocks():
     # 1. Direct NSE attempt
     if nse_session:
         try:
-            url = "https://www.nseindia.com/api/equity-stockIndex?index=SECURITIES%20IN%20F%26O"
-            response = await nse_session.get(url, timeout=5)
+            url = "https://www.nseindia.com/api/NextApi/apiClient/marketWatchApi?functionName=getIndicesData&symbol=SECURITIES%20IN%20F%26O"
+            response = await nse_session.get(url, timeout=6)
             if response.status_code in [401, 403]:
                 await refresh_nse_session()
-                response = await nse_session.get(url, timeout=5)
+                response = await nse_session.get(url, timeout=6)
 
             if response.status_code == 200:
-                nse_data = response.json()
-                raw_data = nse_data.get("data", [])
-                advance = nse_data.get("advance", {})
+                nse_json = response.json()
+                nested_data = nse_json.get("data", {})
+                if isinstance(nested_data, dict):
+                    adu = nested_data.get("aduCount", {})
+                    advance = {
+                        "advances": int(adu.get("advances", 0) or 0),
+                        "declines": int(adu.get("declines", 0) or 0),
+                        "unchanged": int(adu.get("unchange", 0) or adu.get("unchanged", 0) or 0)
+                    }
+                    raw_data = nested_data.get("data", [])
+                else:
+                    advance = nse_json.get("advance", {})
+                    raw_data = nested_data if isinstance(nested_data, list) else []
+
                 sorted_data = sorted(raw_data, key=lambda x: float(x.get("pChange", 0) or 0))
 
                 result = {

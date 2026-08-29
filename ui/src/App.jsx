@@ -68,10 +68,11 @@ function MarketBreadth({ advance }) {
 }
 
 function App() {
+  const CAPITAL = 62580;
   const { marketData, loading, sectorsLoading, error, lastFetchTime, forceRefresh } = useMarketData();
   const [modalData, setModalData] = useState({ symbol: null, type: null })
-  const [maxLoss, setMaxLoss] = useState(1500)
-  const [totalCapital, setTotalCapital] = useState(20000)
+  const [maxLoss, setMaxLoss] = useState(.02 * CAPITAL)
+  const [totalCapital, setTotalCapital] = useState(CAPITAL)
   const [lowVolBarsBefore, setLowVolBarsBefore] = useState(2)
 
   const handleMaxLossChange = useCallback((e) => {
