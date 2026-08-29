@@ -7,7 +7,7 @@ const SectorList = ({ title, sectors, type }) => {
   }, [sectors]);
 
   return (
-    <div className="card list-card">
+    <div className="card list-card sector-card">
       <div className="card-header">
         <h3 className="card-title">
           <span className={`card-title-dot card-title-dot--${type === 'gainer' ? 'gain' : 'loss'}`} />
@@ -17,22 +17,29 @@ const SectorList = ({ title, sectors, type }) => {
       </div>
 
       <ul className="list-items">
-        {sectors?.map((sector) => {
+        {sectors?.map((sector, index) => {
           const change = parseFloat(sector.percentChange) || 0;
           const barWidth = Math.min((Math.abs(change) / maxAbsChange) * 100, 100);
 
           return (
             <li key={sector.index} className="sector-item">
               <div className="sector-row">
-                <strong className="sector-name">{sector.index}</strong>
+                <div className="sector-name-group">
+                  <span className={`sector-rank rank-${index + 1}`}>
+                    {index + 1}
+                  </span>
+                  <strong className="sector-name" title={sector.index}>
+                    {sector.index}
+                  </strong>
+                </div>
                 <span className={`change-badge change-badge--${type === 'gainer' ? 'gain' : 'loss'}`}>
-                  {type === 'gainer' ? '+' : ''}{sector.percentChange}%
+                  {type === 'gainer' ? '▲ +' : '▼ '}{sector.percentChange}%
                 </span>
               </div>
               <div className="sector-bar-track">
                 <div
                   className={`sector-bar-fill sector-bar-fill--${type === 'gainer' ? 'gain' : 'loss'}`}
-                  style={{ width: `${barWidth}%` }}
+                  style={{ width: `${Math.max(barWidth, 6)}%` }}
                 />
               </div>
             </li>
