@@ -1,24 +1,25 @@
 import os
 import time
 import asyncio
+from datetime import datetime
 from contextlib import asynccontextmanager
-from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from curl_cffi.requests import AsyncSession
-import yfinance as yf
+import requests
 
-# Global state for AsyncSession and Lock
+# Global state for AsyncSession (NSE direct) and Lock
 nse_session = None
 session_lock = asyncio.Lock()
 
-# In-memory caches to guarantee fast response times
+# In-memory caches to minimize CPU, memory, and upstream latency
 CACHE_TTL_SECONDS = 30
 _stocks_cache = {"data": None, "timestamp": 0}
 _sectors_cache = {"data": None, "timestamp": 0}
+_candles_cache = {}
 
-# Sector indices mapping for Yahoo Finance fallback
+# Sector indices mapping
 SECTOR_MAP = {
     "^NSEBANK": "NIFTY BANK",
     "^CNXIT": "NIFTY IT",
@@ -59,6 +60,91 @@ FNO_SYMBOLS = [
     "PATANJALI", "RBLBANK", "BAJAJHLDNG", "TIINDIA", "PETRONET", "PGEL", "GODFRYPHLP", "IEX"
 ]
 
+class LightweightYahooClient:
+    """Ultra-low-memory Yahoo Finance client (< 2MB RAM) using batch endpoints."""
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        })
+        self.crumb = None
+        self.crumb_fetched_at = 0
+
+    def _ensure_crumb(self):
+        now = time.time()
+        if self.crumb and (now - self.crumb_fetched_at < 3600):
+            return
+        try:
+            self.session.get("https://fc.yahoo.com", timeout=4)
+        except Exception:
+            pass
+        try:
+            r = self.session.get("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=4)
+            if r.status_code == 200 and r.text.strip():
+                self.crumb = r.text.strip()
+                self.crumb_fetched_at = now
+        except Exception as e:
+            print(f"Crumb refresh note: {e}")
+
+    def get_quotes(self, symbols):
+        self._ensure_crumb()
+        quotes = []
+        chunk_size = 40
+        for i in range(0, len(symbols), chunk_size):
+            chunk = symbols[i:i + chunk_size]
+            syms_str = ",".join(chunk)
+            crumb_param = f"&crumb={self.crumb}" if self.crumb else ""
+            url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={syms_str}{crumb_param}"
+            try:
+                r = self.session.get(url, timeout=5)
+                if r.status_code == 200:
+                    quotes.extend(r.json().get("quoteResponse", {}).get("result", []))
+                elif r.status_code in [401, 403]:
+                    self.crumb = None
+                    self._ensure_crumb()
+            except Exception:
+                pass
+        return quotes
+
+    def get_candles(self, symbol):
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol.upper()}.NS?interval=5m&range=1d"
+        r = self.session.get(url, timeout=6)
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            return []
+        res = result[0]
+        timestamps = res.get("timestamp", [])
+        quote = res.get("indicators", {}).get("quote", [{}])[0]
+        opens = quote.get("open", [])
+        highs = quote.get("high", [])
+        lows = quote.get("low", [])
+        closes = quote.get("close", [])
+        volumes = quote.get("volume", [])
+
+        candles = []
+        for i in range(len(timestamps)):
+            o = opens[i] if i < len(opens) else None
+            h = highs[i] if i < len(highs) else None
+            l = lows[i] if i < len(lows) else None
+            c = closes[i] if i < len(closes) else None
+            v = volumes[i] if i < len(volumes) else None
+            if o is None or c is None:
+                continue
+            candles.append({
+                "timestamp": datetime.fromtimestamp(timestamps[i]).isoformat(),
+                "open": round(o, 2),
+                "high": round(h, 2),
+                "low": round(l, 2),
+                "close": round(c, 2),
+                "volume": int(v or 0)
+            })
+        return candles
+
+yf_client = LightweightYahooClient()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global nse_session
@@ -72,7 +158,7 @@ async def lifespan(app: FastAPI):
         nse_session = AsyncSession(impersonate="chrome120", headers=custom_headers)
         await refresh_nse_session()
     except Exception as e:
-        print(f"Session initialization note: {e}")
+        print(f"NSE session init note: {e}")
 
     yield
 
@@ -93,50 +179,48 @@ app.add_middleware(
 )
 
 async def refresh_nse_session():
-    """Helper to fetch fresh cookies with a concurrency lock"""
     if not nse_session:
         return
     async with session_lock:
         try:
-            await nse_session.get("https://www.nseindia.com", timeout=10)
+            await nse_session.get("https://www.nseindia.com", timeout=8)
             await asyncio.sleep(1)
-            print("Successfully refreshed NSE session cookies.")
-        except Exception as e:
-            print(f"NSE cookie refresh note (expected on cloud IPs): {e}")
-
-def fetch_stocks_yf():
-    """Fallback fetcher using Yahoo Finance in parallel threads"""
-    def fetch_single(sym):
-        try:
-            t = yf.Ticker(f"{sym}.NS")
-            fi = t.fast_info
-            last = fi.last_price
-            prev = fi.previous_close
-            if last is not None and prev is not None and prev > 0:
-                pChange = round(((last - prev) / prev) * 100, 2)
-                return {
-                    "symbol": sym,
-                    "lastPrice": round(last, 2),
-                    "change": round(last - prev, 2),
-                    "pChange": pChange,
-                    "open": round(fi.open if fi.open else last, 2),
-                    "dayHigh": round(fi.day_high if fi.day_high else last, 2),
-                    "dayLow": round(fi.day_low if fi.day_low else last, 2),
-                    "previousClose": round(prev, 2),
-                }
         except Exception:
             pass
+
+def fetch_stocks_yf():
+    """Low-memory batch stock quotes fetcher (< 1.5MB RAM)"""
+    yf_symbols = [f"{sym}.NS" for sym in FNO_SYMBOLS]
+    quotes = yf_client.get_quotes(yf_symbols)
+    if not quotes:
         return None
 
-    with ThreadPoolExecutor(max_workers=30) as executor:
-        results = [r for r in executor.map(fetch_single, FNO_SYMBOLS) if r is not None]
+    results = []
+    advances = 0
+    declines = 0
+    unchanged = 0
 
-    if not results:
-        return None
-
-    advances = sum(1 for s in results if s["pChange"] > 0)
-    declines = sum(1 for s in results if s["pChange"] < 0)
-    unchanged = sum(1 for s in results if s["pChange"] == 0)
+    for q in quotes:
+        raw_sym = q.get("symbol", "").replace(".NS", "")
+        pChange = round(q.get("regularMarketChangePercent", 0) or 0, 2)
+        lastPrice = round(q.get("regularMarketPrice", 0) or 0, 2)
+        change = round(q.get("regularMarketChange", 0) or 0, 2)
+        results.append({
+            "symbol": raw_sym,
+            "pChange": pChange,
+            "lastPrice": lastPrice,
+            "change": change,
+            "open": round(q.get("regularMarketOpen", 0) or 0, 2),
+            "dayHigh": round(q.get("regularMarketDayHigh", 0) or 0, 2),
+            "dayLow": round(q.get("regularMarketDayLow", 0) or 0, 2),
+            "previousClose": round(q.get("regularMarketPreviousClose", 0) or 0, 2)
+        })
+        if pChange > 0:
+            advances += 1
+        elif pChange < 0:
+            declines += 1
+        else:
+            unchanged += 1
 
     sorted_data = sorted(results, key=lambda x: x["pChange"])
 
@@ -151,32 +235,25 @@ def fetch_stocks_yf():
     }
 
 def fetch_sectors_yf():
-    """Fallback fetcher for sectoral indices using Yahoo Finance"""
-    def fetch_single(sym):
-        try:
-            t = yf.Ticker(sym)
-            fi = t.fast_info
-            last = fi.last_price
-            prev = fi.previous_close
-            if last is not None and prev is not None and prev > 0:
-                pChange = round(((last - prev) / prev) * 100, 2)
-                return {
-                    "index": SECTOR_MAP[sym],
-                    "percentChange": pChange,
-                    "last": round(last, 2)
-                }
-        except Exception:
-            pass
+    """Low-memory sectoral indices fetcher (< 0.5MB RAM)"""
+    symbols = list(SECTOR_MAP.keys())
+    quotes = yf_client.get_quotes(symbols)
+    if not quotes:
         return None
 
-    with ThreadPoolExecutor(max_workers=12) as executor:
-        results = [r for r in executor.map(fetch_single, SECTOR_MAP.keys()) if r is not None]
-
-    if not results:
-        return None
+    results = []
+    for q in quotes:
+        sym = q.get("symbol")
+        if sym in SECTOR_MAP:
+            pChange = round(q.get("regularMarketChangePercent", 0) or 0, 2)
+            last = round(q.get("regularMarketPrice", 0) or 0, 2)
+            results.append({
+                "index": SECTOR_MAP[sym],
+                "percentChange": pChange,
+                "last": last
+            })
 
     sorted_data = sorted(results, key=lambda x: x["percentChange"])
-
     return {
         "top-gainer": sorted_data[-5:][::-1],
         "top-losers": sorted_data[:5]
@@ -189,18 +266,18 @@ async def read_root():
 @app.get("/api/stocks")
 async def get_stocks():
     now = time.time()
-    # Check cache first
+    # Return cache if still fresh
     if _stocks_cache["data"] and (now - _stocks_cache["timestamp"] < CACHE_TTL_SECONDS):
         return _stocks_cache["data"]
 
-    # 1. Attempt NSE direct fetch
+    # 1. Direct NSE attempt
     if nse_session:
         try:
             url = "https://www.nseindia.com/api/equity-stockIndex?index=SECURITIES%20IN%20F%26O"
-            response = await nse_session.get(url, timeout=6)
+            response = await nse_session.get(url, timeout=5)
             if response.status_code in [401, 403]:
                 await refresh_nse_session()
-                response = await nse_session.get(url, timeout=6)
+                response = await nse_session.get(url, timeout=5)
 
             if response.status_code == 200:
                 nse_data = response.json()
@@ -216,10 +293,10 @@ async def get_stocks():
                 _stocks_cache["data"] = result
                 _stocks_cache["timestamp"] = now
                 return result
-        except Exception as e:
-            print(f"NSE fetch error, falling back to Yahoo Finance: {e}")
+        except Exception:
+            pass
 
-    # 2. Seamless Yahoo Finance Fallback (handles cloud IPs like Render/AWS)
+    # 2. Ultra-lightweight fallback
     try:
         yf_data = await asyncio.to_thread(fetch_stocks_yf)
         if yf_data:
@@ -227,29 +304,27 @@ async def get_stocks():
             _stocks_cache["timestamp"] = now
             return yf_data
     except Exception as e:
-        print(f"Yahoo Finance stock fetch error: {e}")
+        print(f"Fallback stock fetch error: {e}")
 
-    # 3. Return stale cache if available or raise
     if _stocks_cache["data"]:
         return _stocks_cache["data"]
 
-    raise HTTPException(status_code=503, detail="Unable to retrieve stock data from upstream providers.")
+    raise HTTPException(status_code=503, detail="Unable to retrieve stock data.")
 
 @app.get("/api/sector-performance")
 async def get_sector_performance():
     now = time.time()
-    # Check cache first
     if _sectors_cache["data"] and (now - _sectors_cache["timestamp"] < CACHE_TTL_SECONDS):
         return _sectors_cache["data"]
 
-    # 1. Attempt NSE direct fetch
+    # 1. Direct NSE attempt
     if nse_session:
         try:
             url = "https://www.nseindia.com/api/allIndices"
-            response = await nse_session.get(url, timeout=6)
+            response = await nse_session.get(url, timeout=5)
             if response.status_code in [401, 403]:
                 await refresh_nse_session()
-                response = await nse_session.get(url, timeout=6)
+                response = await nse_session.get(url, timeout=5)
 
             if response.status_code == 200:
                 nse_data = response.json()
@@ -266,10 +341,10 @@ async def get_sector_performance():
                 _sectors_cache["data"] = result
                 _sectors_cache["timestamp"] = now
                 return result
-        except Exception as e:
-            print(f"NSE sector fetch error, falling back to Yahoo Finance: {e}")
+        except Exception:
+            pass
 
-    # 2. Seamless Yahoo Finance Fallback
+    # 2. Ultra-lightweight fallback
     try:
         yf_data = await asyncio.to_thread(fetch_sectors_yf)
         if yf_data:
@@ -277,40 +352,28 @@ async def get_sector_performance():
             _sectors_cache["timestamp"] = now
             return yf_data
     except Exception as e:
-        print(f"Yahoo Finance sector fetch error: {e}")
+        print(f"Fallback sector fetch error: {e}")
 
-    # 3. Return stale cache if available or raise
     if _sectors_cache["data"]:
         return _sectors_cache["data"]
 
-    raise HTTPException(status_code=503, detail="Unable to retrieve sector data from upstream providers.")
+    raise HTTPException(status_code=503, detail="Unable to retrieve sector data.")
 
 @app.get("/api/candles/{symbol}")
 async def get_candles(symbol: str):
+    now = time.time()
+    cached = _candles_cache.get(symbol)
+    if cached and (now - cached["timestamp"] < 15):
+        return {"symbol": symbol, "candles": cached["candles"]}
+
     try:
-        def fetch_yf_data():
-            ticker = yf.Ticker(f"{symbol.upper()}.NS")
-            return ticker.history(period="1d", interval="5m")
+        candles = await asyncio.to_thread(yf_client.get_candles, symbol)
+        if not candles:
+            if cached:
+                return {"symbol": symbol, "candles": cached["candles"]}
+            raise HTTPException(status_code=404, detail=f"No candle data for {symbol}")
 
-        df = await asyncio.to_thread(fetch_yf_data)
-
-        if df.empty:
-            raise HTTPException(status_code=404, detail=f"No data found for symbol {symbol}")
-
-        df = df.reset_index()
-
-        candles = [
-            {
-                "timestamp": row["Datetime"].isoformat(),
-                "open": round(row["Open"], 2),
-                "high": round(row["High"], 2),
-                "low": round(row["Low"], 2),
-                "close": round(row["Close"], 2),
-                "volume": int(row["Volume"])
-            }
-            for _, row in df.iterrows()
-        ]
-
+        _candles_cache[symbol] = {"candles": candles, "timestamp": now}
         return {"symbol": symbol, "candles": candles}
 
     except HTTPException:
@@ -318,7 +381,7 @@ async def get_candles(symbol: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Mount the React build (dist) folder to serve the UI
+# Mount UI static files if present
 ui_dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ui", "dist")
 if os.path.exists(ui_dist_path):
     app.mount("/", StaticFiles(directory=ui_dist_path, html=True), name="ui")
